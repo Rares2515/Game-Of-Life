@@ -235,6 +235,31 @@ int main(int argc, const char *argv[])
     }
 
 
+    //Task 2
+    Node* top=NULL;
+
+    int K_aux=K;
+	while(K)
+	{
+		rules(table,N,M,&top);
+        if(T==2){
+            print_stack(output_file,top,K_aux-K+1);
+            fprintf(output_file,"\n");
+
+        }
+        else if(T==1){
+		    print_table(output_file,table,N,M);
+            fprintf(output_file,"\n");
+        }
+
+		K--;
+	}
+
+
+
+
+    deleteStack(&top);
+
 
 	fclose(input_file);
 	fclose(output_file);
