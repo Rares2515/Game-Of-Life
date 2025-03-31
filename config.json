@@ -1,0 +1,11 @@
+{
+	
+	"source_path": "./GOL.c",
+	"executable_path": "./a.out",
+	"input_path": "./InputData",
+	"output_path": "./OutputData",
+	"ref_path": "./RefData",
+	"forward_path": "./forward",
+	"run_valgrind": true,
+	"tutorial": false
+}
