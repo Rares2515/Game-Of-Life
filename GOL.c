@@ -24,6 +24,24 @@ struct Elem {
 typedef struct Elem Node;
 
 
+
+struct N { 
+	char** table;
+	struct  N  *left,*right; 
+}; 
+typedef struct N Node_tree;
+
+
+void copy_table(char** source, char** destination , int n, int m)
+{
+    for(int i=0; i<n; i++)
+        for(int j=0; j<m; j++)
+            destination[i][j]=source[i][j];
+}
+
+
+
+
 void push(Node** top, Change v) {
     Node* newNode = (Node*)malloc(sizeof(Node));
     newNode->val = v;
@@ -112,7 +130,7 @@ void rules(char** table, int n, int m, Node** top)
     
     deleteStack(top);
 
-    Change* changes = (Change*) malloc(n * m * sizeof(Change));  // Maximul posibil de schimbări
+    Change* changes = (Change*) malloc(n * m * sizeof(Change));  // Max number of changes
     int change_count=0;
 
 
@@ -146,12 +164,7 @@ void rules(char** table, int n, int m, Node** top)
         push(top, changes[i]);
     }
 
-    for(i = 0; i < n; i++) {
-        for(j = 0; j < m; j++) {
-            table[i][j] = new_table[i][j];
-        }
-    }
-
+    copy_table(new_table, table, n, m);
     free_table(new_table, n);
     free(changes);
 }
@@ -182,13 +195,105 @@ void print_stack(FILE *output_file, Node* top, int K)
     for (int i = count_stack - 1; i >= 0; i--) {
         fprintf(output_file, " %d %d", elements[i].row, elements[i].col);
     }
-
-
-
     
 }
 
+void free_tree(Node_tree* root, int n) {
+    if (root == NULL) return;
+    free_table(root->table, n);
+    free_tree(root->left, n);
+    free_tree(root->right, n);
+    free(root);
+}
 
+
+Node_tree* createNode(char** table){
+    Node_tree* newNode = (Node_tree*)malloc(sizeof(Node_tree));
+    newNode->table = table;
+    newNode->left = newNode->right = NULL;
+    return newNode;
+}
+
+char** tree_rule_left(char** table, int n, int m) {
+    char** new_table = aloc_table(n, m);
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            int nralive = count(table, n, m, i, j);
+
+            if (table[i][j]==DEAD && nralive == 2) {
+                new_table[i][j] = ALIVE; 
+            }
+            else new_table[i][j]=table[i][j];
+        }
+ 
+    }
+    return new_table;
+}
+
+
+
+
+char** tree_rules_right(char** table, int n, int m) {
+    char** new_table = aloc_table(n, m);
+
+    for(int i = 0; i < n; i++) {
+        for(int j = 0; j < m; j++) {
+            int alive = count(table, n, m, i, j);
+
+            if(table[i][j] == ALIVE) {
+                if(alive < 2 || alive > 3)
+                    new_table[i][j] = DEAD;
+                else
+                    new_table[i][j] = ALIVE;
+            } else {
+                if(alive == 3)
+                    new_table[i][j] = ALIVE;
+                else
+                    new_table[i][j] = DEAD;
+            }
+        }
+    }
+
+    return new_table;
+}
+
+Node_tree* create_tree(char** table, int n, int m, int k, FILE* output_file) {
+    if(k < 0) {
+        return NULL;
+    }
+
+    char** root_table = aloc_table(n, m);
+    copy_table(table, root_table, n, m);
+
+    Node_tree* root = createNode(root_table);
+
+    //print_table(output_file, root->table, n, m);
+    //fprintf(output_file, "\n");
+
+    char** left_table = tree_rule_left(root_table, n, m);
+    root->left = create_tree(left_table, n, m, k - 1, output_file);
+    free_table(left_table, n);
+
+    char** right_table = tree_rules_right(root_table, n, m);
+    root->right = create_tree(right_table, n, m, k - 1, output_file);
+    free_table(right_table, n);
+
+    return root;
+}
+
+
+
+// Parcurgere în preordine - recursivă
+void preorder(Node_tree* root, FILE* output, int n, int m) {
+    if (root) {
+        //printf("Current table at this node:\n");
+        print_table(output, root->table, n, m);
+        fprintf(output, "\n");
+        preorder(root->left, output, n,m);         // 2. Parcurge subarborele stâng
+        preorder(root->right, output, n,m);        // 3. Parcurge subarborele drept
+    }
+}
 
 
 
@@ -239,7 +344,7 @@ int main(int argc, const char *argv[])
     Node* top=NULL;
 
     int K_aux=K;
-	while(K)
+	while(K>0 &&(T==1 || T==2))
 	{
 		rules(table,N,M,&top);
         if(T==2){
@@ -254,6 +359,16 @@ int main(int argc, const char *argv[])
 
 		K--;
 	}
+    if (T == 3) {
+        //char** copy = aloc_table(N, M);
+        //copy_table(table, copy, N, M);
+        //Node_tree* root = create_tree(copy, N, M, K, output_file);
+        Node_tree* root = create_tree(table, N, M, K, output_file);
+        preorder(root, output_file, N, M);
+        free_tree(root, N);
+        //free_table(copy, N);
+    }
+    
 
 
 
