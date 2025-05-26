@@ -323,54 +323,275 @@ void preorder(Node_tree* root, FILE* output, int n, int m) {
         preorder(root->right, output, n,m);        // 3. Parcurge subarborele drept
     }
 }
-/*
-void lenght(Node_tree* root,char** table,int n, int m, int *l,int *x, int *y)
-{
-    int i,j;
-    *l=0;
-    int l_aux;
-    for(i=0;i<n;i++)
-        for(j=0;j<m;j++)
-    {
-            l_aux=0;
-            int number_of_cells=0;
-            int number_of_connections=0;
-            while(table[i][j]==ALIVE)
-            {
-                connections=count(table, n, m, i, j);
-                
 
-                int aux_i=i,aux_j=j;
-                l_aux++;
-                number_of_cells++;
-            }
-            for(x=aux_i;x<=l_aux;x++)
-                for(y=aux_j;y<l_aux;y++){
-                    int connections=count(table, n, m, i, j);
-                    if(connections<number_of_cells/2) l_aux=0;
-                }
-            if(l_aux>*l) {
-                *l = l_aux;  
-                *x=aux_i;
-                *y=aux_j;
-            }              
-    }
+//Task 4
+
+typedef struct{
+    int row,col;
+}Coord;
+
+
+typedef struct {
+    int** adj;
+    Coord* coords;
+    int size;
+} Graph;
+
+int is_near(Coord a, Coord b)
+{
+    if(abs(a.row-b.row)<=1 && abs(a.col-b.col)<=1 && !(a.row == b.row && a.col == b.col)) return 1;
+    return 0;
 }
 
-void print_lenght(*Node_tree root, int l, int x, int y, int n, int m, *FILE output)
+int compare_paths(const Coord* coords, const int* path1, int len1,const int* path2, int len2) {
+    int min_len = (len1 < len2) ? len1 : len2;
+    for (int i = 0; i < min_len; i++) {
+        Coord c1 = coords[path1[i]];
+        Coord c2 = coords[path2[i]];
+
+        if (c1.row < c2.row) return -1;
+        if (c1.row > c2.row) return 1;
+
+        if (c1.col < c2.col) return -1;
+        if (c1.col > c2.col) return 1;
+    }
+    // Dacă unul e prefixul celuilalt, lanțul mai scurt e mai mic
+    if (len1 < len2) return -1;
+    if (len1 > len2) return 1;
+
+    return 0;
+}
+
+
+
+Graph* create_graph(char** table, int n, int m)
 {
-    int l_aux=l;
-    fprintf(output,"%d\n",l);
-    while(l_aux>0){
-    for(int i=x;i<n;i++)
-        for(int j=y;j<m;j++){
-            fprintf(output,"(%d,%d) ",i,j);
-            l_aux--;
+    Graph* g=(Graph*)malloc(sizeof(Graph));
+    g->coords=(Coord*)malloc(n*m*sizeof(Coord));
+    
+    int number_of_cells=0;
+
+    for(int i=0;i<n;i++)
+        for(int j=0;j<m;j++)
+            if(table[i][j]==ALIVE){
+                g->coords[number_of_cells].row=i;
+                g->coords[number_of_cells].col=j;
+                number_of_cells++;
+            }
+
+    g->size=number_of_cells;
+    g->adj=(int**)malloc(g->size * sizeof(int*));
+    for (int i =0; i<g->size; i++) {
+        g->adj[i]=(int*)calloc(g->size, sizeof(int));
+    }
+
+    for(int i=0; i<g->size; i++)
+        for(int j=i+1; j<g->size; j++)
+            if(is_near(g->coords[i],g->coords[j])){
+                g->adj[i][j]=1;
+                g->adj[j][i]=1;
+            }
+
+    return g;
+}
+
+int in_component(int node, const int* component, const int comp_size) {
+    for (int i=0; i<comp_size; i++)
+        if (component[i]==node) return 1;
+    return 0;
+}
+
+void dfs_component(Graph* g, int node, int* visited, int* component, int* size) {
+    visited[node]=1;
+    component[(*size)++]=node;
+
+    for (int i=0; i<g->size; i++) {
+        if (g->adj[node][i] && !visited[i]) {
+            dfs_component(g, i, visited, component, size);
         }
     }
 }
 
-*/
+void sort_neighbors(int* neighbors, int count, const Graph* g) {
+    for (int i=0; i<count-1; i++) {
+        for (int j=i+1; j<count; j++) {
+            int na=neighbors[i], nb=neighbors[j];
+            if (g->coords[nb].row < g->coords[na].row || (g->coords[nb].row == g->coords[na].row && g->coords[nb].col < g->coords[na].col)) {
+                int temp=neighbors[i];
+                neighbors[i]=neighbors[j];
+                neighbors[j]=temp;
+            }
+        }
+    }
+}
+
+void dfs(Graph* g, int* visited, int current, int* nodes_path, int depth, int comp_size, int* best_length, int* best_path, int* component) {
+    if (visited[current]) return;
+
+    visited[current]=1;
+    nodes_path[depth]=current;
+
+    if (depth+1>*best_length || (depth+1 == *best_length && compare_paths(g->coords, nodes_path, depth+1, best_path, *best_length) < 0)) {
+        *best_length = depth+1;
+        for (int i=0; i<=depth; i++) {
+            best_path[i]=nodes_path[i];
+        }
+    }
+    if (depth+1 == comp_size) {
+        visited[current]=0;
+        return;
+    }
+
+    int* neighbors=malloc(g->size * sizeof(int));
+    int neighbors_count=0;
+    for (int i=0; i<g->size; i++) {
+        if (g->adj[current][i] && !visited[i] && in_component(i, component, comp_size)) {
+            neighbors[neighbors_count++]=i;
+        }
+    }
+
+    sort_neighbors(neighbors,neighbors_count,g);
+
+    for (int i=0; i<neighbors_count; i++) {
+        dfs(g, visited, neighbors[i], nodes_path, depth+1, comp_size, best_length, best_path, component);
+    }
+
+    free(neighbors);
+}
+
+
+
+
+
+void longest_path(Graph* g, FILE* out, int* max_length, int best_path[], int* best_length) {
+    *max_length=0;
+    *best_length=0;
+
+    if (g->size==0) {
+        fprintf(out, "-1\n");
+        return;
+    }
+
+    int* visited_global=(int*) malloc(g->size*sizeof(int));
+    int* component =(int*)malloc(g->size*sizeof(int));
+    int* local_path =(int*)malloc(g->size*sizeof(int));
+    int* local_best =(int*)malloc(g->size*sizeof(int));
+
+
+    for (int i=0; i<g->size; i++) {
+        visited_global[i]=0;
+        component[i]=0;
+        local_path[i]=0;
+        local_best[i]=0;
+    }
+
+
+    for (int i=0; i<g->size; i++) {
+        if (!visited_global[i]) {
+            int comp_size=0;
+            dfs_component(g, i, visited_global, component, &comp_size);
+
+
+            for (int j=0; j<comp_size; j++) {
+                int* local_visited=calloc(g->size, sizeof(int));
+                int local_best_len=0;
+
+                dfs(g, local_visited, component[j], local_path, 0, comp_size, &local_best_len, local_best, component);
+
+                if (local_best_len > *best_length || (local_best_len == *best_length && compare_paths(g->coords, local_best, local_best_len, best_path, *best_length) < 0)) {
+                    *best_length = local_best_len;
+                    *max_length = local_best_len;
+                    for (int k=0; k<local_best_len; k++) {
+                        best_path[k]=local_best[k];
+                    }
+                }
+
+                free(local_visited);
+            }
+        }
+    }
+
+    if (*max_length==0) {
+        fprintf(out, "-1\n");
+    } else {
+        fprintf(out, "%d\n", *max_length - 1);
+        for (int i=0; i<*best_length; i++) {
+            Coord c=g->coords[best_path[i]];
+            fprintf(out, "(%d,%d) ", c.row, c.col);
+        }
+        fprintf(out, "\n");
+    }
+
+    free(visited_global);
+    free(component);
+    free(local_path);
+    free(local_best);
+}
+
+void free_graph(Graph* g, int n) {
+    for (int i=0; i<g->size; i++) {
+        free(g->adj[i]);
+    }
+    free(g->adj);
+    free(g->coords);
+    free(g);
+}
+
+Node_tree* create_tree_graph(char** table, int n, int m, int k, FILE* output_file) {
+    //printf("Entering create_tree_graph with k=%d\n", k);
+    if (k<0) {
+        printf("k < 0, return NULL\n");
+        return NULL;
+    }
+
+    // Alocarea tabelului root_table
+    char** root_table = aloc_table(n, m);
+    if (root_table == NULL) {
+        printf("Eroare la alocarea root_table\n");
+        return NULL;
+    }
+    copy_table(table, root_table, n, m);
+
+    // Crearea nodului root
+    Node_tree* root = createNode(root_table);
+    //printf("Created node for root\n");
+
+    // Crearea grafului
+    Graph* g = create_graph(root_table, n, m);
+    //printf("Graph created\n");
+
+    int max_length = -1, best_length;
+int* best_path = malloc(g->size * sizeof(int));
+
+
+    longest_path(g, output_file, &max_length, best_path, &best_length);
+    //printf("Longest path computed: max_len = %d\n", max_length);
+    free_graph(g, n);
+    //printf("Graph processed\n");
+
+    // Crearea subarborelui stâng
+    char** left_table = tree_rule_left(root_table, n, m, root);
+    //printf("Left table created\n");
+    root->left = create_tree_graph(left_table, n, m, k - 1, output_file);
+    free_table(left_table, n);
+
+    // Crearea subarborelui drept
+    char** right_table = tree_rules_right(root_table, n, m, root);
+    //printf("Right table created\n");
+    root->right = create_tree_graph(right_table, n, m, k - 1, output_file);
+    free_table(right_table, n);
+
+    // Eliberarea memoriei pentru root_table
+    free_table(root_table, n);
+    //printf("Memory for root_table freed\n");
+    free(best_path);
+
+    return root;
+}
+
+
+
+
 
 int main(int argc, const char *argv[])
 {
@@ -442,6 +663,10 @@ int main(int argc, const char *argv[])
         //preorder(root, output_file, N, M);
         free_tree(root, N);
         //free_table(copy, N);
+    }
+    if(T==4){
+        Node_tree* root = create_tree_graph(table, N, M, K, output_file);
+        free_tree(root, N);
     }
     
 
