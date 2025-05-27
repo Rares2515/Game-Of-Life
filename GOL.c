@@ -355,14 +355,11 @@ int compare_paths(const Coord* coords, const int* path1, int len1,const int* pat
         if (c1.col < c2.col) return -1;
         if (c1.col > c2.col) return 1;
     }
-    // Dacă unul e prefixul celuilalt, lanțul mai scurt e mai mic
     if (len1 < len2) return -1;
     if (len1 > len2) return 1;
 
     return 0;
 }
-
-
 
 Graph* create_graph(char** table, int n, int m)
 {
@@ -590,6 +587,54 @@ int* best_path = malloc(g->size * sizeof(int));
 }
 
 
+//BONUS TASK 2
+void apply_reverse_changes(char** table, Node* changes) {
+    while (changes != NULL) {
+        int i = changes->val.row;
+        int j = changes->val.col;
+
+        if (table[i][j] == ALIVE) {
+            table[i][j] = DEAD;
+        }else {
+            table[i][j] = ALIVE;
+}
+
+        changes = changes->next;
+    }
+}
+
+void reconstruct_generation_0(char** table, int n, int m, Node* gen_stack) {
+    Node* current = gen_stack;
+    while (current != NULL) {
+        apply_reverse_changes(table, current);
+        current = current->next;
+    }
+}
+
+Node* read_stack_of_lists(FILE* input, int* last_gen) {
+    Node* top = NULL;
+    int k, row, col;
+
+    while (fscanf(input, "%d", &k) == 1) {
+        *last_gen = k;
+        Node* gen_changes = NULL;
+
+        while (fscanf(input, "%d %d", &row, &col) == 2) {
+            Change c = {row, col};
+            Node* new_node = (Node*)malloc(sizeof(Node));
+            new_node->val = c;
+            new_node->next = gen_changes;
+            gen_changes = new_node;
+        }
+
+        Node* new_stack = (Node*)malloc(sizeof(Node));
+        new_stack->val = gen_changes->val;
+        new_stack->next = top;
+        top = new_stack;
+    }
+
+    return top;
+}
 
 
 
@@ -667,6 +712,20 @@ int main(int argc, const char *argv[])
     if(T==4){
         Node_tree* root = create_tree_graph(table, N, M, K, output_file);
         free_tree(root, N);
+    }
+    if(T==777){
+        Node* bonus_top = NULL; // Inițializezi stiva
+        int gen, row, col;
+        fscanf(input_file, "%d", &gen); // Citește generația (de ex. 15)
+        while (fscanf(input_file, "%d %d", &row, &col) == 2) {
+            Change ch = { row, col };
+            push(&bonus_top, ch);
+            }
+
+
+        Node* gen_stack = read_stack_of_lists(bonus_top, &K);
+        reconstruct_generation_0(table, N, M, gen_stack);
+        print_table(output_file, table, N, M);
     }
     
 
